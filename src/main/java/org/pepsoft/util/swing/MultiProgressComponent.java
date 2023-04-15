@@ -81,7 +81,7 @@ public class MultiProgressComponent<T> extends javax.swing.JPanel implements Pro
     }
 
     public void start() {
-        if ("true".equalsIgnoreCase(System.getProperty("org.pepsoft.worldpainter.devMode"))) {
+        if ("true".equalsIgnoreCase(System.getProperty("org.pepsoft.devMode"))) {
             stats = new ArrayList<>();
         }
         jButton1.setEnabled(cancelable);

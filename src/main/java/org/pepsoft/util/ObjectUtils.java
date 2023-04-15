@@ -24,8 +24,10 @@ public final class ObjectUtils {
     }
 
     /**
-     * Make a deep copy of an object. Only a restricted set of types is
-     * supported.
+     * Make a deep copy of an object. Only a restricted set of types is supported.
+     *
+     * <p><string>Note</string> that this method also treats {@link Point} as immutable, even though technically it is
+     * not!
      *
      * @param <T> The type of the object.
      * @param object The object to copy.
@@ -35,8 +37,6 @@ public final class ObjectUtils {
      */
     @SuppressWarnings("unchecked")
     public static <T> T copyObject(T object) {
-        // Point isn't actually immutable, but it is used as such by WorldPainter, at least in all data structures
-        // managed by an undo manager
         if ((object == null) || (object instanceof Number) || (object instanceof Character)
                 || (object instanceof Boolean) || (object instanceof String) || (object instanceof Enum)
                 || (object instanceof Point) || (object instanceof Immutable)) {

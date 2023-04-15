@@ -50,7 +50,7 @@ public final class PluginManager {
      * @param publicKey The public key corresponding to the private key with which the plugins must have been signed.
      * @param descriptorPath The resource path of the file containing the plugin descriptor.
      * @param hostVersion The version of the host, for the update checking process and for checking the minimum required
-     *                    WorldPainter version of the plugins.
+     *                    host version of the plugins.
      */
     public static void loadPlugins(File pluginDir, PublicKey publicKey, String descriptorPath, Version hostVersion, boolean updatePlugins) {
         if (logger.isDebugEnabled()) {
@@ -72,7 +72,7 @@ public final class PluginManager {
                     }
                     final Descriptor descriptor = loadDescriptor(jarFile, descriptorPath);
                     if ((descriptor.minimumHostVersion != null) && (! hostVersion.isAtLeast(descriptor.minimumHostVersion))) {
-                        String message = "Plugin " + descriptor.name + " requires at least version " + descriptor.minimumHostVersion + " of WorldPainter";
+                        String message = "Plugin " + descriptor.name + " requires at least version " + descriptor.minimumHostVersion + " of the host";
                         errors.add(message);
                         logger.error(message + "; not loading it");
                         continue;
@@ -107,7 +107,7 @@ public final class PluginManager {
                 try {
                     findPlugins(type, descriptorPath, pluginJar, plugins);
                 } catch (ClassNotFoundException | IllegalAccessException | InstantiationException | NoClassDefFoundError e) {
-                    errors.add(stripDirectory(pluginJar.getName()) + " could not be loaded; perhaps it is not compatible with this version of WorldPainter");
+                    errors.add(stripDirectory(pluginJar.getName()) + " could not be loaded; perhaps it is not compatible with this version of the host");
                     logger.error("{} while instantiating plugin {} (message: {}); skipping plugin", e.getClass().getSimpleName(), pluginJar.getName(), e.getMessage(), e);
                 }
             }
@@ -151,8 +151,7 @@ public final class PluginManager {
     @SuppressWarnings({"StatementWithEmptyBody", "BooleanMethodIsAlwaysInverted"})
     private static boolean isSigned(JarFile jarFile, PublicKey publicKey) throws IOException {
         for (Enumeration<JarEntry> e = jarFile.entries(); e.hasMoreElements(); ) {
-            // Iterator over all the entries in the jar except directories and
-            // signature files
+            // Iterator over all the entries in the jar except directories and signature files
             JarEntry jarEntry = e.nextElement();
             String entryName = jarEntry.getName().toUpperCase();
             if (jarEntry.isDirectory() || entryName.endsWith(".SF") || entryName.endsWith(".DSA") || entryName.endsWith(".EC") || entryName.endsWith(".RSA")) {
@@ -165,8 +164,7 @@ public final class PluginManager {
                 while (in.read(buffer) != -1) ;
             }
 
-            // Get the signing certificate chain and check if one of them is the
-            // WorldPainter plugin signing certificate
+            // Get the signing certificate chain and check if one of them is the plugin signing certificate
             Certificate[] certificates = jarEntry.getCertificates();
             boolean signed = false;
             if (certificates != null) {
@@ -208,7 +206,7 @@ public final class PluginManager {
                     }
                 }
             } catch (IOException | ClassNotFoundException | IllegalAccessException | InstantiationException e) {
-                errors.add("Could not load or initialise plugin from class path; internal WorldPainter error");
+                errors.add("Could not load or initialise plugin from class path; internal error");
                 logger.error("{} while instantiating plugin (message: {}); skipping plugin", e.getClass().getSimpleName(), e.getMessage(), e);
             }
         }

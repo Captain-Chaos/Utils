@@ -1,6 +1,5 @@
 /*
- * WorldPainter, a graphical and interactive map generator for Minecraft.
- * Copyright © 2011-2015  pepsoft.org, The Netherlands
+ * Copyright © 2011-2023  pepsoft.org, The Netherlands
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
