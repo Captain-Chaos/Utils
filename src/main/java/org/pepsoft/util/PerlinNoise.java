@@ -38,7 +38,8 @@ public final class PerlinNoise implements Serializable, Cloneable {
      * between 0 (inclusive) and 256 (exclusive), so the input should be
      * constrained to be between those values for best results (otherwise the
      * pattern will start to repeat).
-     *
+     * 
+     * 
      * @param x The point for which to determine the noise value.
      * @return A noise value between -0.5 and 0.5.
      */
@@ -51,6 +52,7 @@ public final class PerlinNoise implements Serializable, Cloneable {
      * between 0 (inclusive) and 256 (exclusive), so the input should be
      * constrained to be between those values for best results (otherwise the
      * pattern will start to repeat).
+     * use (x/scale, y/scale) to control the perlin blob size, 256 is a good start for large scale noise
      *
      * @param x The X coordinate of the point for which to determine the noise
      *     value.
