@@ -197,6 +197,10 @@ public final class MathUtils {
         return (value < min) ? min : ((value > max) ? max : value);
     }
 
+    public static long clamp(long min, long value, long max) {
+        return (value < min) ? min : ((value > max) ? max : value);
+    }
+
     public static float clamp(float min, float value, float max) {
         return (value < min) ? min : ((value > max) ? max : value);
     }
