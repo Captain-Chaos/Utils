@@ -6,6 +6,7 @@
 package org.pepsoft.util;
 
 /**
+ * Utility methods for working with {@code int 0xrrggbb} encoded colour values.
  *
  * @author pepijn
  */
@@ -14,6 +15,10 @@ public final class ColourUtils {
         // Prevent instantiation
     }
 
+    /**
+     * Mix two colours by mixing their red, green and blue components exactly equally. This is a convenience method for
+     * calling {@code mix(colour1, colour2, 128)}.
+     */
     public static int mix(int colour1, int colour2) {
         final int red   = ((colour1 & 0xFF0000) >> 17) + ((colour2 & 0xFF0000) >> 17);
         final int green = ((colour1 & 0x00FF00) >>  9) + ((colour2 & 0x00FF00) >>  9);
@@ -21,6 +26,10 @@ public final class ColourUtils {
         return (red << 16) | (green << 8) | blue;
     }
 
+    /**
+     * Mix two colours by mixing their red, green and blue components according to an alpha value between 0 and 256
+     * (inclusive), where an alpha of 0 results in just {@code colour1} and 256 in just {@code colour2}.
+     */
     public static int mix(int colour1, int colour2, int alpha) {
         final int red1   = (colour1 & 0xFF0000) >> 16;
         final int green1 = (colour1 & 0x00FF00) >> 8;
@@ -28,9 +37,9 @@ public final class ColourUtils {
         final int red2   = (colour2 & 0xFF0000) >> 16;
         final int green2 = (colour2 & 0x00FF00) >> 8;
         final int blue2  =  colour2 & 0x0000FF;
-        final int red   = (red1   * alpha + red2   * (255 - alpha)) / 255;
-        final int green = (green1 * alpha + green2 * (255 - alpha)) / 255;
-        final int blue  = (blue1  * alpha + blue2  * (255 - alpha)) / 255;
+        final int red   = (red1   * alpha + red2   * (256 - alpha)) / 256;
+        final int green = (green1 * alpha + green2 * (256 - alpha)) / 256;
+        final int blue  = (blue1  * alpha + blue2  * (256 - alpha)) / 256;
         return (red << 16) | (green << 8) | blue;
     }
     
