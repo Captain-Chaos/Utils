@@ -242,7 +242,7 @@ public final class MathUtils {
      * line segment.
      */
     public static double distanceToLineSegment(int px, int py, int vx, int vy, int wx, int wy) {
-        return Math.sqrt(distToSegmentSquared(px, py, vx, vy, wx, wy));
+        return Math.sqrt(distToSegmentSquared(vx, vy, wx, wy, px, py));
     }
 
     private static double dist2(double x1, double y1, double x2, double y2) {
