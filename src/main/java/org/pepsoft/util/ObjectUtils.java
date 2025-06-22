@@ -5,9 +5,9 @@
  */
 package org.pepsoft.util;
 
+import org.jetbrains.annotations.NotNull;
 import org.pepsoft.util.undo.Cloneable;
 
-import javax.annotation.Nonnull;
 import java.awt.*;
 import java.awt.image.*;
 import java.util.List;
@@ -200,7 +200,7 @@ public final class ObjectUtils {
      * return {@code null}.
      */
     @SafeVarargs
-    public static @Nonnull <T> T coalesce(T firstValue, Supplier<T>... subsequentValueSuppliers) {
+    public static @NotNull <T> T coalesce(T firstValue, Supplier<T>... subsequentValueSuppliers) {
         if (firstValue != null) {
             return firstValue;
         } else {

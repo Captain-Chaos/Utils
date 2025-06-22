@@ -34,6 +34,9 @@ public final class SystemUtils {
     }
 
     public static final Version JAVA_VERSION = Version.parse(System.getProperty("java.specification.version"));
+    public static final Version JAVA_25 = new Version(25);
+    public static final Version JAVA_21 = new Version(21);
+    public static final Version JAVA_17 = new Version(17);
     public static final Version JAVA_11 = new Version(11);
     public static final Version JAVA_10 = new Version(10);
     public static final Version JAVA_9  = new Version(9);
