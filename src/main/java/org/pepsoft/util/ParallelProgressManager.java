@@ -8,7 +8,11 @@ package org.pepsoft.util;
 import org.pepsoft.util.ProgressReceiver.OperationCancelled;
 import org.pepsoft.util.ProgressReceiver.OperationCancelledByUser;
 
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.VarHandle;
 import java.util.BitSet;
+import java.util.concurrent.atomic.*;
+import java.util.concurrent.locks.ReentrantLock;
 
 import static org.pepsoft.util.ExceptionUtils.chainContains;
 
@@ -56,79 +60,103 @@ import static org.pepsoft.util.ExceptionUtils.chainContains;
  * @author pepijn
  */
 public class ParallelProgressManager {
+    private static final VarHandle INT_ARRAY_HANDLE = MethodHandles.arrayElementVarHandle(int[].class);
+    private final ReentrantLock progressLock = new ReentrantLock();
+    private final ProgressReceiver progressReceiver;
+    private final AtomicInteger taskCount = new AtomicInteger();//Top bit of task count indicates if done has been called
+    private final AtomicInteger taskIncrementer = new AtomicInteger();
+    private final AtomicLong taskProgress = new AtomicLong();
+    private final AtomicReference<Throwable> exception = new AtomicReference<>();
+    private volatile boolean started;
+    private AtomicLongArray taskProgresses;
+    private volatile int[] taskDones;
+    private final int taskLimit;
+
+
     public ParallelProgressManager(ProgressReceiver progressReceiver) {
         this.progressReceiver = progressReceiver;
-        taskCountKnown = false;
+        this.taskLimit = -1;
     }
     
     public ParallelProgressManager(ProgressReceiver progressReceiver, int taskCount) {
         this.progressReceiver = progressReceiver;
-        this.taskCount = taskCount;
-        taskCountKnown = true;
-        taskProgress = new float[taskCount];
-        running.set(0, taskCount);
-        started = true;
+        this.taskLimit = taskCount;
+        this.startIfNot();
     }
     
-    public synchronized ProgressReceiver createProgressReceiver() {
-        if ((! taskCountKnown) && started) {
-            throw new IllegalStateException("Cannot create new progress receivers after tasks have started");
-        }
-        if (taskCountKnown && (tasksCreated == taskCount)) {
-            throw new IllegalStateException("Attempt to create more sub progress receivers than indicated task count (" + taskCount + ")");
-        }
-        return new SubProgressReceiver(tasksCreated++);
-    }
-    
-    public synchronized void join() throws InterruptedException {
-        while (true) {
-            if (! started) {
-                wait();
-            } else {
-                if (running.isEmpty()) {
-                    return;
-                } else {
-                    wait();
-                }
+    public ProgressReceiver createProgressReceiver() {
+        this.progressLock.lock();//Use the lock here to ensure synchronization with starting
+        int id = 0;
+        try {
+            if (this.taskLimit == -1 && this.started) {
+                throw new IllegalStateException("Cannot create new progress receivers after tasks have started");
             }
+            id = this.taskIncrementer.getAndIncrement();
+            if (id >= this.taskLimit) {
+                throw new IllegalStateException("Attempt to create more sub progress receivers than indicated task count (" + this.taskLimit + ")");
+            }
+        } finally {
+            this.progressLock.unlock();
+        }
+        this.taskCount.incrementAndGet();
+        return new SubProgressReceiver(id);
+    }
+    
+    /** @noinspection BusyWait*/
+    public void join() throws InterruptedException {
+        while ((!this.started) || (this.getTaskCount()) != 0) {
+            Thread.sleep(100);
         }
     }
     
-    public synchronized boolean isExceptionThrown() {
-        return exceptionThrown;
+    public boolean isExceptionThrown() {
+        return this.exception.get() == null;
     }
 
-    private synchronized void setProgress(int index, float subProgress) throws OperationCancelled {
-        if (! started) {
-            start();
-        }
-        cancelIfPreviousException();
-        taskProgress[index] = subProgress;
-        float totalProgress = 0.0f;
-        for (float progress: taskProgress) {
-            totalProgress += progress;
-        }
+    private int getTaskCount() {
+        return this.taskCount.get()&(~(1<<31));
+    }
+
+    private void setProgress(int index, float subProgress) throws OperationCancelled {
+        final long SCALE_FACTOR = 1000;
+        final long thisVal = (long) (subProgress * SCALE_FACTOR);
+        this.startIfNot();
+        this.cancelIfPreviousException();
+        long totalProgress = this.taskProgress.addAndGet(thisVal-this.taskProgresses.getAndSet(index, thisVal));
+        float progress = (float) ((((double)totalProgress)/this.getTaskCount())/SCALE_FACTOR);
+
         try {
-            progressReceiver.setProgress(totalProgress / taskCount);
+            if (this.progressLock.tryLock()) {
+                try {
+                    this.progressReceiver.setProgress(progress);
+                } finally {
+                    this.progressLock.unlock();
+                }
+            }
         } catch (OperationCancelled e) {
-            previousException = e;
+            if (this.exception.getAndSet(e) == null) {
+                this.progressLock.lock();
+                try {
+                    this.progressReceiver.exceptionThrown(e);
+                } finally {
+                    this.progressLock.unlock();
+                }
+            }
             throw e;
         }
     }
     
-    private synchronized void exceptionThrown(int index, Throwable exception) {
-        if (! started) {
-            start();
-        }
-        exceptionThrown = true;
-        if (previousException == null) {
-            previousException = exception;
-        }
-        running.clear(index);
-        notifyAll();
-        if (! exceptionReported) {
-            exceptionReported = true;
-            progressReceiver.exceptionThrown(exception);
+    private void exceptionThrown(int index, Throwable exception) {
+        this.startIfNot();
+        this.stopRunningIfNot(index);
+        var ex =this.exception.compareAndExchange(null, exception);
+        if (ex == null) {
+            this.progressLock.lock();
+            try {
+                this.progressReceiver.exceptionThrown(exception);
+            } finally {
+                this.progressLock.unlock();
+            }
         } else if (chainContains(exception, OperationCancelledByUser.class)) {
             if (logger.isDebugEnabled()) {
                 logger.debug("Operation cancelled by user; not reporting to progress receiver");
@@ -140,63 +168,73 @@ public class ParallelProgressManager {
         }
     }
 
-    private synchronized void done(int index) {
-        if (! started) {
-            start();
-        }
-        running.clear(index);
-        notifyAll();
-        if (! exceptionReported) {
-            if (running.isEmpty()) {
-                progressReceiver.done();
+    private void done(int index) {
+        this.startIfNot();
+        this.stopRunningIfNot(index);
+        if (this.exception.get()==null) {
+            if (this.taskCount.compareAndExchange(0, 1<<31)==0) {
+                this.progressLock.lock();
+                try {
+                    this.progressReceiver.done();
+                } finally {
+                    this.progressLock.unlock();
+                }
             }
         }
     }
 
-    private synchronized void setMessage(int index, String message) throws OperationCancelled {
-        if (! started) {
-            start();
+    private void setMessage(int index, String message) throws OperationCancelled {
+        this.startIfNot();
+        this.cancelIfPreviousException();
+        this.progressLock.lock();
+        try {
+            this.progressReceiver.setMessage(message);
+        } finally {
+            this.progressLock.unlock();
         }
-        cancelIfPreviousException();
-        progressReceiver.setMessage(message);
     }
 
-    private synchronized void checkForCancellation() throws OperationCancelled {
-        if (! started) {
-            start();
-        }
-        cancelIfPreviousException();
+    private void checkForCancellation() throws OperationCancelled {
+        this.startIfNot();
+        this.cancelIfPreviousException();
     }
 
-    private synchronized void subProgressStarted(org.pepsoft.util.SubProgressReceiver subProgressReceiver) throws OperationCancelled {
-        if (! started) {
-            start();
+    private void subProgressStarted(org.pepsoft.util.SubProgressReceiver subProgressReceiver) throws OperationCancelled {
+        this.startIfNot();
+        this.cancelIfPreviousException();
+        this.progressLock.lock();
+        try {
+            this.progressReceiver.subProgressStarted(subProgressReceiver);
+        } finally {
+            this.progressLock.unlock();
         }
-        cancelIfPreviousException();
-        progressReceiver.subProgressStarted(subProgressReceiver);
     }
 
-    private synchronized void start() {
-        taskCount = tasksCreated;
-        taskProgress = new float[taskCount];
-        running.set(0, taskCount);
-        started = true;
-        notifyAll();
+    private void startIfNot() {
+        if (this.started) return;
+        this.progressLock.lock();
+        if (this.started) return;
+        int taskCount = this.taskLimit;
+        if (taskCount == -1) taskCount = this.taskIncrementer.get();
+        this.taskProgresses = new AtomicLongArray(taskCount);
+        this.taskDones = new int[(taskCount+31)/32];
+        this.started = true;
+        this.progressLock.unlock();
+    }
+
+    private void stopRunningIfNot(int index) {
+        int msk = 1<<(index&31);
+        if ((this.taskDones[index>>5]&msk)!=0) return;//Already stopped
+        if (((int)INT_ARRAY_HANDLE.getAndBitwiseOr(this.taskDones, index>>5, msk)&msk)!=0) return;//Already stopped
+        this.taskCount.decrementAndGet();
     }
 
     private void cancelIfPreviousException() throws OperationCancelled {
-        if (previousException != null) {
-            throw new OperationCancelled("Operation cancelled due to exception on other thread (type: " + previousException.getClass().getSimpleName() + ", message: " + previousException.getMessage() + ")", previousException);
+        var ex = this.exception.get();
+        if (ex != null) {
+            throw new OperationCancelled("Operation cancelled due to exception on other thread (type: " + ex.getClass().getSimpleName() + ", message: " + ex.getMessage() + ")", ex);
         }
     }
-    
-    private final ProgressReceiver progressReceiver;
-    private final boolean taskCountKnown;
-    private final BitSet running = new BitSet();
-    private int taskCount, tasksCreated;
-    private float[] taskProgress;
-    private Throwable previousException;
-    private boolean started, exceptionThrown, exceptionReported;
 
     private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(ParallelProgressManager.class);
 
@@ -207,22 +245,22 @@ public class ParallelProgressManager {
         
         @Override
         public void setProgress(float progress) throws OperationCancelled {
-            ParallelProgressManager.this.setProgress(index, progress);
+            ParallelProgressManager.this.setProgress(this.index, progress);
         }
 
         @Override
         public void exceptionThrown(Throwable exception) {
-            ParallelProgressManager.this.exceptionThrown(index, exception);
+            ParallelProgressManager.this.exceptionThrown(this.index, exception);
         }
 
         @Override
         public void done() {
-            ParallelProgressManager.this.done(index);
+            ParallelProgressManager.this.done(this.index);
         }
 
         @Override
         public void setMessage(String message) throws OperationCancelled {
-            ParallelProgressManager.this.setMessage(index, message);
+            ParallelProgressManager.this.setMessage(this.index, message);
         }
 
         @Override

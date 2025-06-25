@@ -19,7 +19,7 @@ import java.io.*;
 public final class PerlinNoise implements Serializable, Cloneable {
     public PerlinNoise(long seed) {
         this.seed = seed;
-        improvedNoise = new ImprovedNoise(seed);
+        this.fastNoise.setSeed(seed);
     }
 
     public long getSeed() {
@@ -29,7 +29,7 @@ public final class PerlinNoise implements Serializable, Cloneable {
     public void setSeed(long seed) {
         if (seed != this.seed) {
             this.seed = seed;
-            improvedNoise = new ImprovedNoise(seed);
+            this.fastNoise.setSeed(seed);
         }
     }
 
@@ -43,7 +43,7 @@ public final class PerlinNoise implements Serializable, Cloneable {
      * @return A noise value between -0.5 and 0.5.
      */
     public float getPerlinNoise(double x) {
-        return (float) (improvedNoise.noise(x, 0, 0));
+        return this.fastNoise.sampleResult(x);
     }
 
     /**
@@ -59,7 +59,7 @@ public final class PerlinNoise implements Serializable, Cloneable {
      * @return A noise value between -0.5 and 0.5.
      */
     public float getPerlinNoise(double x, double y) {
-        return (float) (improvedNoise.noise(x, y, 0) * FACTOR_2D);
+        return fastNoise.sampleResult(x, y) * FACTOR_2D;
     }
 
     /**
@@ -77,7 +77,7 @@ public final class PerlinNoise implements Serializable, Cloneable {
      * @return A noise value between -0.5 and 0.5.
      */
     public float getPerlinNoise(double x, double y, double z) {
-        return (float) (improvedNoise.noise(x, y, z) * FACTOR_3D);
+        return this.fastNoise.sampleResult(x, y, z) * FACTOR_3D;
     }
     
     @Override
@@ -108,18 +108,18 @@ public final class PerlinNoise implements Serializable, Cloneable {
     
     private void readObject(ObjectInputStream in) throws IOException, ClassNotFoundException {
         in.defaultReadObject();
-
-        // Legacy maps
-        if (improvedNoise == null) {
-            improvedNoise = new ImprovedNoise(seed);
+        if (this.fastNoise == null) {
+            this.fastNoise = new FastPerlin();
         }
+
+        this.fastNoise.setSeed(this.seed);
     }
 
     private long seed;
-    private ImprovedNoise improvedNoise;
+    private transient FastPerlin fastNoise = new FastPerlin();
 
-    private static final double FACTOR_2D = 0.5;
-    private static final double FACTOR_3D = 0.4824607142760952;
+    private static final float FACTOR_2D = 0.5f;
+    private static final float FACTOR_3D = 0.4824607142760952f;
     private static final long serialVersionUID = 2011040701L;
 
     private static final float[] LEVEL_FOR_PROMILLAGE = new float[10001];
