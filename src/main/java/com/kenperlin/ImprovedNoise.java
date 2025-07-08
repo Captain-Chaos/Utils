@@ -25,8 +25,8 @@ public final class ImprovedNoise implements Serializable {
      * <table>
      *     <tr><th>Dimensions</th><th>Range</th></tr>
      *     <tr><td>1</td><td>[-0.5, 0.5]</td></tr>
-     *     <tr><td>1</td><td>[-1.0, 1.0]</td></tr>
-     *     <tr><td>1</td><td>[-1.036353811211803, 1.036353811211803]<a href="https://www.gamedev.net/forums/topic/285533-2d-perlin-noise-gradient-noise-range/2796760/?page=3">*</a></td></tr>
+     *     <tr><td>2</td><td>[-1.0, 1.0]</td></tr>
+     *     <tr><td>3</td><td>[-1.036353811211803, 1.036353811211803]<a href="https://www.gamedev.net/forums/topic/285533-2d-perlin-noise-gradient-noise-range/2796760/?page=3">*</a></td></tr>
      * </table>
      */
     public double noise(double x, double y, double z) {
