@@ -12,9 +12,9 @@ public class FastPerlin {
 
         for(int i = 0; i < 256; ++i) {
             int j = r.nextInt(256 - i);
-            byte b = permutation[i];
-            permutation[i] = permutation[i + j];
-            permutation[i + j] = b;
+            byte b = permutation[255-i];
+            permutation[255-i] = permutation[j];
+            permutation[j] = b;
         }
 
         for (int i = 0; i < 256; i++) {
