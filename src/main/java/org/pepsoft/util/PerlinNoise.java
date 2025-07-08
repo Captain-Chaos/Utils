@@ -5,7 +5,6 @@
 
 package org.pepsoft.util;
 
-import com.kenperlin.ImprovedNoise;
 import org.pepsoft.util.mdc.MDCCapturingRuntimeException;
 import org.pepsoft.util.mdc.MDCWrappingRuntimeException;
 
@@ -19,7 +18,7 @@ import java.io.*;
 public final class PerlinNoise implements Serializable, Cloneable {
     public PerlinNoise(long seed) {
         this.seed = seed;
-        improvedNoise = new ImprovedNoise(seed);
+        fastPerlin = new FastPerlin(seed);
     }
 
     public long getSeed() {
@@ -29,7 +28,7 @@ public final class PerlinNoise implements Serializable, Cloneable {
     public void setSeed(long seed) {
         if (seed != this.seed) {
             this.seed = seed;
-            improvedNoise = new ImprovedNoise(seed);
+            fastPerlin = new FastPerlin(seed);
         }
     }
 
@@ -43,7 +42,7 @@ public final class PerlinNoise implements Serializable, Cloneable {
      * @return A noise value between -0.5 and 0.5.
      */
     public float getPerlinNoise(double x) {
-        return (float) (improvedNoise.noise(x, 0, 0));
+        return fastPerlin.sampleResult(x);
     }
 
     /**
@@ -59,7 +58,7 @@ public final class PerlinNoise implements Serializable, Cloneable {
      * @return A noise value between -0.5 and 0.5.
      */
     public float getPerlinNoise(double x, double y) {
-        return (float) (improvedNoise.noise(x, y, 0) * FACTOR_2D);
+        return (float) (fastPerlin.sampleResult(x, y) * FACTOR_2D);
     }
 
     /**
@@ -77,7 +76,7 @@ public final class PerlinNoise implements Serializable, Cloneable {
      * @return A noise value between -0.5 and 0.5.
      */
     public float getPerlinNoise(double x, double y, double z) {
-        return (float) (improvedNoise.noise(x, y, z) * FACTOR_3D);
+        return (float) (fastPerlin.sampleResult(x, y, z) * FACTOR_3D);
     }
     
     @Override
@@ -105,25 +104,27 @@ public final class PerlinNoise implements Serializable, Cloneable {
             return level1 + (LEVEL_FOR_PROMILLAGE[((int) promillage) + 1] - level1) * (promillage - (int) promillage);
         }
     }
-    
+
+    @Serial
     private void readObject(ObjectInputStream in) throws IOException, ClassNotFoundException {
         in.defaultReadObject();
 
         // Legacy maps
-        if (improvedNoise == null) {
-            improvedNoise = new ImprovedNoise(seed);
+        if (fastPerlin == null) {
+            fastPerlin = new FastPerlin(seed);
         }
     }
 
     private long seed;
-    private ImprovedNoise improvedNoise;
+    private FastPerlin fastPerlin;
 
     private static final double FACTOR_2D = 0.5;
     private static final double FACTOR_3D = 0.4824607142760952;
+    @Serial
     private static final long serialVersionUID = 2011040701L;
 
     private static final float[] LEVEL_FOR_PROMILLAGE = new float[10001];
-    
+
     static {
         // Initialise the array from a file, because it is too large to
         // initialise with a static initialiser. It generates a "code too large"
