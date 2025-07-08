@@ -1,11 +1,14 @@
 package org.pepsoft.util;
 
+import java.io.Serial;
+import java.io.Serializable;
+
 /**
  * Fast implementation of Perlin noise.
  *
  * @author <a href="https://github.com/MCRcortex">MCRcortex</a>
  */
-public class FastPerlin {
+public class FastPerlin implements Serializable {
     public FastPerlin(long seed) {
         final UnsafeRandom r = new UnsafeRandom(seed);
         final byte[] permutation = new byte[256];
@@ -23,14 +26,6 @@ public class FastPerlin {
         for (int i = 0; i < 256; i++) {
             permPair[i] = (short) ((permutation[i] & 0xFF) | ((permutation[(i + 1) & 0xFF] & 0xFF) << 8));
         }
-    }
-
-    private static float fade(float v) {
-        return v * v * v * Math.fma(v, Math.fma(v, 6f, -15f), 10f);
-    }
-
-    private int getPair(int idx) {
-        return permPair[idx & 0xFF] & 0xFFFF;
     }
 
     public float sampleResult(double X) {
@@ -101,6 +96,14 @@ public class FastPerlin {
                                 grad(x1y1z >> 8, lx - 1.0f, ly - 1.0f, lz - 1.0f))));
     }
 
+    private int getPair(int idx) {
+        return permPair[idx & 0xFF] & 0xFFFF;
+    }
+
+    private static float fade(float v) {
+        return v * v * v * Math.fma(v, Math.fma(v, 6f, -15f), 10f);
+    }
+
     private static float grad(int v, float x, float y, float z) {
         v = (v & 15) * 3;
         return Math.fma(x, LUT2[v], Math.fma(y, LUT2[v + 1], z * LUT2[v + 2]));
@@ -140,4 +143,6 @@ public class FastPerlin {
         -1, 1, 0,
         0, -1, -1
     };
+    @Serial
+    private static final long serialVersionUID = 1L;
 }
